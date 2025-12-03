@@ -6,12 +6,25 @@ import { generateHSKVocab } from './services/geminiService';
 import { parseExcelFile } from './services/excelService';
 import { getSavedSets, createVocabSet, updateVocabSet, deleteVocabSet } from './services/storageService';
 
+const LOADING_MESSAGES = [
+  "🐼 Gấu trúc đang mài mực...",
+  "🎋 Đang đi hái lá tre...",
+  "📖 Đang lật từ điển Hán Ngữ...",
+  "📞 Đang gọi điện hỏi người thân...",
+  "🍜 Đang ăn bát mì vằn thắn...",
+  "🏮 Đang treo đèn lồng...",
+  "🍵 Đang pha trà đàm đạo...",
+  "🧠 Gấu trúc đang vắt óc suy nghĩ...",
+  "✈️ Đang bay sang Bắc Kinh lấy từ vựng..."
+];
+
 const App: React.FC = () => {
   const [view, setView] = useState<AppView>(AppView.AUTH);
   const [user, setUser] = useState<User | null>(null);
   const [gameConfig, setGameConfig] = useState<GameConfig | null>(null);
   const [vocabList, setVocabList] = useState<VocabItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null); // New state for offline warning
   
@@ -26,6 +39,18 @@ const App: React.FC = () => {
     const sets = getSavedSets();
     setSavedSets(sets);
   }, []);
+
+  // Cycle loading messages
+  useEffect(() => {
+    let interval: any;
+    if (isLoading) {
+      setLoadingMsg(LOADING_MESSAGES[Math.floor(Math.random() * LOADING_MESSAGES.length)]);
+      interval = setInterval(() => {
+        setLoadingMsg(LOADING_MESSAGES[Math.floor(Math.random() * LOADING_MESSAGES.length)]);
+      }, 2500);
+    }
+    return () => clearInterval(interval);
+  }, [isLoading]);
 
   // -- Actions --
 
@@ -199,9 +224,14 @@ const App: React.FC = () => {
       )}
 
       {isLoading && (
-         <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center">
-            <div className="text-6xl animate-bounce mb-4">🐼</div>
-            <p className="text-xl font-bold text-panda-dark">Đang xử lý...</p>
+         <div className="fixed inset-0 bg-white/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center animate-pop">
+            <div className="text-6xl animate-bounce mb-6">🐼</div>
+            <p className="text-xl font-bold text-panda-dark mb-2">{loadingMsg}</p>
+            <div className="flex gap-1">
+               <div className="w-3 h-3 bg-panda-primary rounded-full animate-bounce" style={{animationDelay: '0s'}}></div>
+               <div className="w-3 h-3 bg-panda-secondary rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+               <div className="w-3 h-3 bg-panda-accent rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+            </div>
          </div>
       )}
 
@@ -258,7 +288,8 @@ const App: React.FC = () => {
          {/* Custom Lists */}
          <div className="lg:col-span-7 flex flex-col gap-6">
              <div className="bg-white p-6 rounded-3xl shadow-lg border-b-4 border-panda-accent h-full">
-                <div className="flex items-center justify-between mb-6">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-4">
                    <div className="flex items-center gap-3">
                       <span className="text-3xl">📂</span>
                       <div>
@@ -266,20 +297,10 @@ const App: React.FC = () => {
                         <p className="text-xs text-gray-400">Tự ôn tập từ vựng riêng</p>
                       </div>
                    </div>
-                   
-                    <div className="w-40">
-                      <select 
-                        id="saved-mode"
-                        className="w-full p-2 text-sm rounded-lg border-2 border-gray-200 focus:border-panda-accent outline-none bg-gray-50"
-                        defaultValue={GameMode.HANZI_MEANING}
-                      >
-                        <option value={GameMode.HANZI_MEANING}>Hán - Nghĩa</option>
-                        <option value={GameMode.HANZI_PINYIN}>Hán - Pinyin</option>
-                      </select>
-                    </div>
                 </div>
 
-                <div className="flex gap-2 mb-6 bg-yellow-50 p-3 rounded-xl border border-yellow-100">
+                {/* Input Create */}
+                <div className="flex gap-2 mb-4 bg-yellow-50 p-3 rounded-xl border border-yellow-100">
                   <input 
                     type="text" 
                     placeholder="Tên danh sách mới..."
@@ -293,6 +314,22 @@ const App: React.FC = () => {
                   </Button>
                 </div>
 
+                {/* Mode Select (Moved Here) */}
+                <div className="flex justify-end mb-4">
+                    <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200 hover:border-panda-accent transition-colors">
+                        <span className="text-xs font-bold text-gray-500 uppercase">Chế độ chơi:</span>
+                        <select 
+                          id="saved-mode"
+                          className="text-sm bg-transparent font-semibold text-panda-dark outline-none cursor-pointer"
+                          defaultValue={GameMode.HANZI_MEANING}
+                        >
+                          <option value={GameMode.HANZI_MEANING}>Hán - Nghĩa</option>
+                          <option value={GameMode.HANZI_PINYIN}>Hán - Pinyin</option>
+                        </select>
+                    </div>
+                </div>
+
+                {/* List Items */}
                 <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                   {savedSets.length === 0 ? (
                     <div className="text-center py-10 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl">
