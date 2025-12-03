@@ -1,25 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { VocabItem, CardItem, GameMode } from '../types';
-import GameCard from './GameCard';
-import Button from './Button';
+import { VocabItem, GameMode, CardItem } from '../types';
 import confetti from 'canvas-confetti';
+import Button from './Button';
 
 interface GameProps {
   vocabList: VocabItem[];
   mode: GameMode;
   onExit: () => void;
-  onRestart: () => void; // Chơi lại danh sách hiện tại
-  onNext: () => void;    // Tạo danh sách mới
+  onRestart: () => void;
+  onNext: () => void;
 }
 
 const Game: React.FC<GameProps> = ({ vocabList, mode, onExit, onRestart, onNext }) => {
   const [cards, setCards] = useState<CardItem[]>([]);
-  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
-  const [wrongPairIds, setWrongPairIds] = useState<string[]>([]);
-  const [matchedCount, setMatchedCount] = useState(0);
+  const [selectedCards, setSelectedCards] = useState<string[]>([]);
+  const [matchedPairs, setMatchedPairs] = useState<string[]>([]);
+  const [score, setScore] = useState(0);
+  const [isComplete, setIsComplete] = useState(false);
 
-  // Initialize Game
   useEffect(() => {
+    initializeGame();
+  }, [vocabList, mode]);
+
+  const initializeGame = () => {
     const newCards: CardItem[] = [];
     
     vocabList.forEach((vocab) => {
@@ -33,147 +36,189 @@ const Game: React.FC<GameProps> = ({ vocabList, mode, onExit, onRestart, onNext 
         isSelected: false,
       });
 
-      // Card 2: Based on Mode
-      const content2 = mode === GameMode.HANZI_PINYIN ? vocab.pinyin : vocab.meaning;
-      const type2 = mode === GameMode.HANZI_PINYIN ? 'pinyin' : 'meaning';
-
-      newCards.push({
-        id: `${vocab.id}-${type2}`,
-        content: content2,
-        vocabId: vocab.id,
-        type: type2,
-        isMatched: false,
-        isSelected: false,
-      });
+      // Card 2: Pinyin or Meaning (based on mode)
+      if (mode === GameMode.HANZI_PINYIN) {
+        newCards.push({
+          id: `${vocab.id}-pinyin`,
+          content: vocab.pinyin,
+          vocabId: vocab.id,
+          type: 'pinyin',
+          isMatched: false,
+          isSelected: false,
+        });
+      } else {
+        newCards.push({
+          id: `${vocab.id}-meaning`,
+          content: vocab.meaning,
+          vocabId: vocab.id,
+          type: 'meaning',
+          isMatched: false,
+          isSelected: false,
+        });
+      }
     });
 
-    // Shuffle
+    // Shuffle cards
     const shuffled = newCards.sort(() => Math.random() - 0.5);
     setCards(shuffled);
-    setSelectedCardId(null);
-    setWrongPairIds([]);
-    setMatchedCount(0);
-  }, [vocabList, mode]);
+    setSelectedCards([]);
+    setMatchedPairs([]);
+    setScore(0);
+    setIsComplete(false);
+  };
 
-  const handleCardClick = (clickedCard: CardItem) => {
-    // Ignore clicks on matched cards or if we are currently showing an error animation
-    if (clickedCard.isMatched || wrongPairIds.length > 0) return;
+  const handleCardClick = (cardId: string) => {
+    const card = cards.find(c => c.id === cardId);
+    if (!card || card.isMatched || selectedCards.includes(cardId)) return;
+    if (selectedCards.length >= 2) return;
 
-    // Deselect if clicking the same card
-    if (clickedCard.id === selectedCardId) {
-      setSelectedCardId(null);
-      setCards(prev => prev.map(c => c.id === clickedCard.id ? { ...c, isSelected: false } : c));
-      return;
-    }
+    const newSelected = [...selectedCards, cardId];
+    setSelectedCards(newSelected);
 
-    // Select the card visually
-    setCards(prev => prev.map(c => 
-      c.id === clickedCard.id ? { ...c, isSelected: true } : 
-      c.id === selectedCardId ? c : // Keep the currently selected one selected
-      { ...c, isSelected: false } // Deselect others (safety)
+    // Update card state
+    setCards(cards.map(c => 
+      c.id === cardId ? { ...c, isSelected: true } : c
     ));
 
-    if (selectedCardId === null) {
-      // First card selection
-      setSelectedCardId(clickedCard.id);
-    } else {
-      // Second card selection - check match
-      const prevCard = cards.find(c => c.id === selectedCardId);
-      if (!prevCard) return;
-
-      if (prevCard.vocabId === clickedCard.vocabId) {
-        // MATCH!
-        setCards(prev => prev.map(c => 
-          c.id === clickedCard.id || c.id === selectedCardId
-            ? { ...c, isMatched: true, isSelected: false }
-            : c
-        ));
-        setMatchedCount(prev => prev + 1);
-        setSelectedCardId(null);
-      } else {
-        // NO MATCH
-        setWrongPairIds([selectedCardId, clickedCard.id]);
-        
-        // Show error state
-        setCards(prev => prev.map(c => 
-          c.id === clickedCard.id || c.id === selectedCardId
-            ? { ...c, isError: true, isSelected: false }
-            : c
-        ));
-
-        // Reset after delay
-        setTimeout(() => {
-          setWrongPairIds([]);
-          setSelectedCardId(null);
-          setCards(prev => prev.map(c => 
-            c.id === clickedCard.id || c.id === selectedCardId
-              ? { ...c, isError: false, isSelected: false }
-              : c
-          ));
-        }, 800);
-      }
+    if (newSelected.length === 2) {
+      checkMatch(newSelected);
     }
   };
 
-  // Win Condition
-  useEffect(() => {
-    if (vocabList.length > 0 && matchedCount === vocabList.length) {
-      confetti({
-        particleCount: 150,
-        spread: 70,
-        origin: { y: 0.6 },
-        colors: ['#FF9FAC', '#A0E8AF', '#FFD57E']
-      });
-    }
-  }, [matchedCount, vocabList.length]);
+  const checkMatch = (selected: string[]) => {
+    const [id1, id2] = selected;
+    const card1 = cards.find(c => c.id === id1);
+    const card2 = cards.find(c => c.id === id2);
 
-  const isWin = vocabList.length > 0 && matchedCount === vocabList.length;
+    if (card1 && card2 && card1.vocabId === card2.vocabId) {
+      // Match!
+      setTimeout(() => {
+        setCards(cards.map(c => 
+          c.vocabId === card1.vocabId 
+            ? { ...c, isMatched: true, isSelected: false }
+            : c
+        ));
+        setMatchedPairs([...matchedPairs, card1.vocabId]);
+        setSelectedCards([]);
+        setScore(score + 10);
+
+        // Confetti effect
+        confetti({
+          particleCount: 50,
+          spread: 60,
+          origin: { y: 0.6 }
+        });
+
+        // Check if game complete
+        if (matchedPairs.length + 1 === vocabList.length) {
+          setTimeout(() => {
+            setIsComplete(true);
+            confetti({
+              particleCount: 100,
+              spread: 70,
+              origin: { y: 0.6 }
+            });
+          }, 500);
+        }
+      }, 500);
+    } else {
+      // No match
+      setTimeout(() => {
+        setCards(cards.map(c => 
+          selected.includes(c.id)
+            ? { ...c, isSelected: false, isError: true }
+            : c
+        ));
+        
+        setTimeout(() => {
+          setCards(cards.map(c => ({ ...c, isError: false })));
+          setSelectedCards([]);
+        }, 500);
+      }, 500);
+    }
+  };
+
+  if (isComplete) {
+    return (
+      <div className="max-w-2xl mx-auto bg-white p-8 rounded-3xl shadow-xl text-center">
+        <div className="text-6xl mb-4">🎉</div>
+        <h2 className="text-3xl font-bold text-panda-dark mb-2">Chúc mừng!</h2>
+        <p className="text-gray-600 mb-6">Bạn đã hoàn thành màn chơi!</p>
+        <div className="bg-panda-accent/20 p-4 rounded-xl mb-6">
+          <p className="text-4xl font-bold text-panda-dark">{score} điểm</p>
+        </div>
+        <div className="flex gap-4 justify-center flex-wrap">
+          <Button onClick={onRestart} variant="secondary">
+            🔄 Chơi Lại
+          </Button>
+          <Button onClick={onNext} variant="primary">
+            ▶️ Chơi Tiếp
+          </Button>
+          <Button onClick={onExit} variant="danger">
+            🏠 Về Trang Chủ
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col items-center w-full max-w-4xl mx-auto p-4">
+    <div className="max-w-6xl mx-auto px-4">
       {/* Header */}
-      <div className="flex justify-between items-center w-full mb-2">
-         <div className="flex items-center gap-2">
-            <span className="text-2xl font-bold text-panda-dark">Điểm: {matchedCount} / {vocabList.length}</span>
-         </div>
-         <Button variant="outline" onClick={onExit} className="!py-2 !px-4 text-sm">
-           Thoát
-         </Button>
+      <div className="bg-white p-4 rounded-xl shadow-lg mb-6 flex justify-between items-center">
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={onExit}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            ← Thoát
+          </button>
+          <div>
+            <p className="text-sm text-gray-500">Điểm</p>
+            <p className="text-2xl font-bold text-panda-primary">{score}</p>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="text-sm text-gray-500">Tiến độ</p>
+          <p className="text-lg font-bold text-panda-dark">
+            {matchedPairs.length} / {vocabList.length}
+          </p>
+        </div>
       </div>
-      
-      <p className="text-panda-dark/70 mb-6 font-semibold">
-        Ghép các cặp từ tương ứng lại với nhau nhé!
-      </p>
 
-      {/* Grid */}
-      <div className="grid grid-cols-4 gap-3 sm:gap-4 md:gap-6 w-full mb-8">
-        {cards.map(card => (
-          <GameCard key={card.id} card={card} onClick={handleCardClick} />
+      {/* Cards Grid */}
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4">
+        {cards.map((card) => (
+          <button
+            key={card.id}
+            onClick={() => handleCardClick(card.id)}
+            disabled={card.isMatched || selectedCards.length >= 2}
+            className={`
+              aspect-square p-4 rounded-xl font-bold text-center transition-all duration-300
+              flex items-center justify-center text-lg
+              ${card.isMatched 
+                ? 'bg-green-100 border-4 border-green-400 text-green-700 scale-95 opacity-50' 
+                : card.isSelected
+                  ? 'bg-blue-100 border-4 border-blue-400 text-blue-700 scale-105 shadow-lg'
+                  : card.isError
+                    ? 'bg-red-100 border-4 border-red-400 text-red-700 animate-shake'
+                    : 'bg-white border-4 border-gray-200 text-panda-dark hover:border-panda-primary hover:shadow-lg active:scale-95'
+              }
+              ${card.type === 'hanzi' ? 'text-2xl' : 'text-base'}
+            `}
+          >
+            {card.content}
+          </button>
         ))}
       </div>
 
-      {/* Win Modal Overlay */}
-      {isWin && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-pop">
-           <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl border-4 border-panda-secondary">
-              <div className="text-6xl mb-4">🐼🎉</div>
-              <h2 className="text-3xl font-extrabold text-panda-dark mb-2">Tuyệt vời!</h2>
-              <p className="text-gray-600 mb-6">Bạn đã ghép đúng tất cả các từ.</p>
-              
-              <div className="flex flex-col gap-3">
-                <Button variant="secondary" onClick={onNext} className="w-full text-green-900">
-                  ➡ Chơi tiếp (Từ mới)
-                </Button>
-                <Button onClick={onRestart} className="w-full">
-                  ↺ Chơi lại (Bài này)
-                </Button>
-                <Button variant="outline" onClick={onExit} className="w-full">
-                  🏠 Về trang chủ
-                </Button>
-              </div>
-           </div>
-        </div>
-      )}
+      {/* Helper Text */}
+      <div className="mt-6 text-center text-gray-500 text-sm">
+        {mode === GameMode.HANZI_PINYIN 
+          ? '💡 Ghép Hán tự với Pinyin tương ứng'
+          : '💡 Ghép Hán tự với nghĩa tiếng Việt'
+        }
+      </div>
     </div>
   );
 };
