@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { AppView, User, GameMode, VocabItem, GameConfig, VocabSet } from './types';
 import Button from './components/Button';
 import Game from './components/Game';
+import APIStatusChecker from './components/APIStatusChecker';
 import { generateHSKVocab } from './services/geminiService';
 import { parseExcelFile } from './services/excelService';
 import { getSavedSets, createVocabSet, updateVocabSet, deleteVocabSet } from './services/storageService';
@@ -187,7 +188,11 @@ const App: React.FC = () => {
                <p className="text-sm text-gray-500">Hôm nay bạn muốn học gì?</p>
             </div>
          </div>
-         <Button variant="outline" onClick={() => setView(AppView.AUTH)} className="!px-3 !py-1 text-xs">Đăng xuất</Button>
+         
+         <div className="flex items-center gap-3">
+           <APIStatusChecker />
+           <Button variant="outline" onClick={() => setView(AppView.AUTH)} className="!px-3 !py-1 text-xs hidden sm:block">Đăng xuất</Button>
+         </div>
       </header>
 
       {error && (
