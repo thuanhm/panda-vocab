@@ -13,15 +13,15 @@ const App: React.FC = () => {
   const [vocabList, setVocabList] = useState<VocabItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [warning, setWarning] = useState<string | null>(null); // State mới cho cảnh báo nhẹ (Offline mode)
+  const [warning, setWarning] = useState<string | null>(null); // New state for offline warning
   
-  // State quản lý danh sách
+  // Storage State
   const [savedSets, setSavedSets] = useState<VocabSet[]>([]);
   const [newSetName, setNewSetName] = useState('');
   const [targetSetIdForImport, setTargetSetIdForImport] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load danh sách đã lưu khi khởi chạy
+  // Load saved sets
   useEffect(() => {
     const sets = getSavedSets();
     setSavedSets(sets);
@@ -30,7 +30,6 @@ const App: React.FC = () => {
   // -- Actions --
 
   const handleLogin = () => {
-    // Mock Login
     setUser({
       name: "Gấu Trúc Nhỏ",
       avatar: "https://picsum.photos/200/200"
@@ -50,19 +49,19 @@ const App: React.FC = () => {
       setGameConfig({ sourceType: 'HSK', hskLevel: level, mode });
       
       if (result.source === 'FALLBACK') {
-        setWarning(`⚠️ Đang dùng dữ liệu Offline cho HSK ${level}. (Không tìm thấy API Key hoặc lỗi mạng)`);
+        setWarning(`⚠️ Đang dùng chế độ Offline cho HSK ${level}. (Kết nối API bị gián đoạn)`);
       }
       
       setView(AppView.GAME);
     } catch (err) {
-      // Vì đã có fallback nên rất hiếm khi nhảy vào đây
-      setError("Không thể khởi tạo trò chơi. Vui lòng tải lại trang.");
+      // Should rarely happen due to fallback logic
+      setError("Không thể khởi tạo trò chơi. Vui lòng thử lại.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // 1. Tạo danh sách mới
+  // 1. Create List
   const handleCreateSet = () => {
     if (!newSetName.trim()) return;
     const updated = createVocabSet(newSetName);
@@ -70,16 +69,16 @@ const App: React.FC = () => {
     setNewSetName('');
   };
 
-  // 2. Kích hoạt chọn file cho một danh sách cụ thể
+  // 2. Trigger File Upload
   const triggerFileUpload = (setId: string) => {
     setTargetSetIdForImport(setId);
     if (fileInputRef.current) {
-      fileInputRef.current.value = ''; // Reset input
+      fileInputRef.current.value = '';
       fileInputRef.current.click();
     }
   };
 
-  // 3. Xử lý file excel sau khi chọn
+  // 3. Handle File Change
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !targetSetIdForImport) return;
@@ -89,14 +88,12 @@ const App: React.FC = () => {
     try {
       const vocab = await parseExcelFile(file);
       
-      // Update logic: Gộp vào danh sách hiện tại
       const updatedSets = updateVocabSet(targetSetIdForImport, vocab);
       setSavedSets(updatedSets);
 
-      // Tìm danh sách vừa update để hiển thị thông báo
       const currentSet = updatedSets.find(s => s.id === targetSetIdForImport);
       const msg = `Đã nhập thành công ${vocab.length} từ vào danh sách "${currentSet?.name}".`;
-      alert(msg); // Hoặc dùng toast notification đẹp hơn nếu có
+      alert(msg);
 
     } catch (err: any) {
       setError(typeof err === 'string' ? err : "Lỗi khi đọc file Excel.");
@@ -106,18 +103,17 @@ const App: React.FC = () => {
     }
   };
 
-  // 4. Chơi một danh sách đã lưu
+  // 4. Play Saved Set
   const handlePlaySavedSet = (set: VocabSet) => {
     if (set.items.length < 4) {
-      setError(`Danh sách "${set.name}" cần ít nhất 4 từ để bắt đầu chơi. Hãy nhập thêm từ vựng!`);
+      setError(`Danh sách "${set.name}" cần ít nhất 4 từ để bắt đầu. Hãy thêm từ vựng!`);
       return;
     }
 
-    // Lấy mode từ thẻ select bên giao diện
     const modeSelect = document.getElementById('saved-mode') as HTMLSelectElement;
     const mode = (modeSelect?.value as GameMode) || GameMode.HANZI_MEANING;
 
-    // Random lấy tối đa 12 từ để chơi cho đỡ rối mắt
+    // Randomize up to 12 words
     const selectedVocab = [...set.items].sort(() => 0.5 - Math.random()).slice(0, 12);
     
     setVocabList(selectedVocab);
@@ -127,28 +123,24 @@ const App: React.FC = () => {
   };
 
   const handleDeleteSet = (id: string) => {
-    if (window.confirm("Bạn có chắc muốn xóa danh sách này và toàn bộ từ vựng bên trong?")) {
+    if (window.confirm("Bạn có chắc muốn xóa danh sách này?")) {
       const updated = deleteVocabSet(id);
       setSavedSets(updated);
     }
   };
 
-  // Chơi lại bài cũ (Reshuffle các thẻ)
   const handleRestart = () => {
     const currentList = [...vocabList].sort(() => 0.5 - Math.random());
     setVocabList([]); 
     setTimeout(() => setVocabList(currentList), 10);
   };
 
-  // Chơi tiếp (Lấy từ mới)
   const handleNextLevel = () => {
     if (!gameConfig) return;
 
-    // Trường hợp 1: HSK - Gọi API lấy từ mới
     if (gameConfig.sourceType === 'HSK' && gameConfig.hskLevel) {
       handleHSKSelection(gameConfig.hskLevel, gameConfig.mode);
     }
-    // Trường hợp 2: Custom List - Random lại 12 từ khác từ danh sách gốc
     else if (gameConfig.sourceType === 'UPLOAD' && gameConfig.setId) {
       const currentSet = savedSets.find(s => s.id === gameConfig.setId);
       if (currentSet) {
@@ -178,7 +170,7 @@ const App: React.FC = () => {
           Đăng nhập bằng Google
         </button>
         <p className="mt-4 text-xs text-gray-400">
-          *Đây là bản demo. Không cần tài khoản thật.
+          *Bản Demo không yêu cầu tài khoản thật.
         </p>
       </div>
     </div>
@@ -189,11 +181,11 @@ const App: React.FC = () => {
       <header className="flex justify-between items-center mb-8">
          <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-panda-primary">
-               <img src={user?.avatar} alt="Người dùng" className="w-full h-full object-cover" />
+               <img src={user?.avatar} alt="User" className="w-full h-full object-cover" />
             </div>
             <div>
                <h2 className="font-bold text-xl text-panda-dark">Chào, {user?.name}!</h2>
-               <p className="text-sm text-gray-500">Hôm nay bạn muốn học gì?</p>
+               <p className="text-sm text-gray-500">Sẵn sàng học chưa nào?</p>
             </div>
          </div>
          <Button variant="outline" onClick={() => setView(AppView.AUTH)} className="!px-3 !py-1 text-xs">Đăng xuất</Button>
@@ -213,7 +205,6 @@ const App: React.FC = () => {
          </div>
       )}
 
-      {/* Hidden File Input used for importing into specific sets */}
       <input 
         type="file" 
         accept=".xlsx"
@@ -224,14 +215,14 @@ const App: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
          
-         {/* LEFT COLUMN: HSK PRACTICE */}
+         {/* HSK Practice */}
          <div className="lg:col-span-5 flex flex-col gap-6">
              <div className="bg-white p-6 rounded-3xl shadow-lg border-b-4 border-panda-primary h-full">
                 <div className="flex items-center gap-3 mb-4">
                    <span className="text-3xl">📚</span>
                    <div>
-                     <h3 className="text-2xl font-bold text-panda-dark">Luyện tập HSK</h3>
-                     <p className="text-xs text-gray-400">Tạo thẻ ngẫu nhiên bằng AI</p>
+                     <h3 className="text-2xl font-bold text-panda-dark">Luyện HSK</h3>
+                     <p className="text-xs text-gray-400">Từ vựng chuẩn HSK 1-9</p>
                    </div>
                 </div>
                 
@@ -264,7 +255,7 @@ const App: React.FC = () => {
              </div>
          </div>
 
-         {/* RIGHT COLUMN: MY VOCAB LISTS */}
+         {/* Custom Lists */}
          <div className="lg:col-span-7 flex flex-col gap-6">
              <div className="bg-white p-6 rounded-3xl shadow-lg border-b-4 border-panda-accent h-full">
                 <div className="flex items-center justify-between mb-6">
@@ -272,11 +263,10 @@ const App: React.FC = () => {
                       <span className="text-3xl">📂</span>
                       <div>
                         <h3 className="text-2xl font-bold text-panda-dark">Danh sách của tôi</h3>
-                        <p className="text-xs text-gray-400">Quản lý và ôn tập bộ từ vựng riêng</p>
+                        <p className="text-xs text-gray-400">Tự ôn tập từ vựng riêng</p>
                       </div>
                    </div>
                    
-                   {/* Game Mode Selector for Saved Lists */}
                     <div className="w-40">
                       <select 
                         id="saved-mode"
@@ -289,11 +279,10 @@ const App: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Create New List Form */}
                 <div className="flex gap-2 mb-6 bg-yellow-50 p-3 rounded-xl border border-yellow-100">
                   <input 
                     type="text" 
-                    placeholder="Đặt tên danh sách mới (VD: Đồ ăn, HSK1 Bài 5...)"
+                    placeholder="Tên danh sách mới..."
                     className="flex-1 p-2 bg-white border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-panda-accent/50"
                     value={newSetName}
                     onChange={(e) => setNewSetName(e.target.value)}
@@ -304,20 +293,18 @@ const App: React.FC = () => {
                   </Button>
                 </div>
 
-                {/* List of Sets */}
                 <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                   {savedSets.length === 0 ? (
                     <div className="text-center py-10 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl">
                        <p className="mb-2 text-2xl">📭</p>
                        <p>Chưa có danh sách nào.</p>
-                       <p className="text-sm">Hãy tạo danh sách và nhập file Excel vào nhé!</p>
+                       <p className="text-sm">Hãy tạo danh sách mới ngay!</p>
                     </div>
                   ) : (
                     savedSets.map((set) => (
                       <div key={set.id} className="bg-gray-50 rounded-xl p-4 border border-gray-200 hover:border-panda-accent transition-all group relative">
                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             
-                            {/* Set Info */}
                             <div className="flex items-start gap-3">
                                <div className="bg-white p-3 rounded-lg text-2xl shadow-sm">
                                  {set.items.length > 0 ? '📝' : '📁'}
@@ -335,21 +322,18 @@ const App: React.FC = () => {
                                </div>
                             </div>
 
-                            {/* Actions */}
                             <div className="flex items-center gap-2 self-end sm:self-center">
                                <button 
                                  onClick={() => triggerFileUpload(set.id)}
                                  className="flex items-center gap-1 px-3 py-2 bg-white border border-gray-300 text-gray-600 rounded-lg hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-colors text-sm font-semibold"
-                                 title="Nhập thêm từ file Excel"
                                >
-                                 📥 Thêm Excel
+                                 📥 Import
                                </button>
                                
                                <button 
                                  onClick={() => handlePlaySavedSet(set)}
                                  disabled={set.items.length < 4}
                                  className="flex items-center gap-1 px-4 py-2 bg-panda-primary text-white rounded-lg hover:bg-pink-400 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed font-bold transition-transform active:scale-95"
-                                 title={set.items.length < 4 ? "Cần ít nhất 4 từ để chơi" : "Bắt đầu chơi"}
                                >
                                  ▶ Chơi
                                </button>
@@ -357,7 +341,6 @@ const App: React.FC = () => {
                                <button 
                                  onClick={() => handleDeleteSet(set.id)}
                                  className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors ml-1"
-                                 title="Xóa danh sách"
                                >
                                  🗑
                                </button>
@@ -380,7 +363,7 @@ const App: React.FC = () => {
       {view === AppView.DASHBOARD && renderDashboard()}
       {view === AppView.GAME && (
         <div className="min-h-screen bg-sky-50 py-8 relative">
-           {/* Fallback Warning Toast */}
+           {/* Offline Warning Toast */}
            {warning && (
              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-yellow-100 text-yellow-800 px-6 py-3 rounded-full shadow-lg border-2 border-yellow-300 animate-bounce-small flex items-center gap-2">
                 <span>📶</span>

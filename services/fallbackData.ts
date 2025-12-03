@@ -1,6 +1,6 @@
 import { VocabItem } from "../types";
 
-// Kiểu dữ liệu đơn giản cho kho từ vựng (không cần ID vì sẽ tạo lúc runtime)
+// Simple type for storage (no ID needed yet)
 type SimpleVocab = Omit<VocabItem, "id">;
 
 const HSK_DATA: Record<number, SimpleVocab[]> = {
@@ -106,51 +106,61 @@ const HSK_DATA: Record<number, SimpleVocab[]> = {
     { hanzi: "拔苗助长", pinyin: "bámiáozhùzhǎng", meaning: "Dục tốc bất đạt" },
     { hanzi: "把关", pinyin: "bǎguān", meaning: "Kiểm tra, rà soát" },
   ],
-  // Fallback cho HSK 7-9 (Dùng chung HSK 6 nâng cao hoặc mẫu)
+  // Fallback for higher levels (using a mix of idioms or high level words)
   7: [
     { hanzi: "博大精深", pinyin: "bódàjīngshēn", meaning: "Uyên bác thâm sâu" },
     { hanzi: "不可思议", pinyin: "bùkěsīyì", meaning: "Không thể tưởng tượng nổi" },
     { hanzi: "不屑一顾", pinyin: "búxièyígù", meaning: "Không thèm để ý" },
     { hanzi: "沧海桑田", pinyin: "cānghǎisāngtián", meaning: "Bãi bể nương dâu" },
     { hanzi: "草木皆兵", pinyin: "cǎomùjiēbīng", meaning: "Thần hồn nát thần tính" },
+    { hanzi: "持之以恒", pinyin: "chízhīyǐhéng", meaning: "Kiên trì bền bỉ" },
+    { hanzi: "出类拔萃", pinyin: "chūlèibácuì", meaning: "Xuất chúng" },
+    { hanzi: "吹毛求疵", pinyin: "chuīmáoqiúcī", meaning: "Bới lông tìm vết" },
   ],
   8: [
      { hanzi: "唇亡齿寒", pinyin: "chúnwángchǐhán", meaning: "Môi hở răng lạnh" },
      { hanzi: "打草惊蛇", pinyin: "dǎcǎojīngshé", meaning: "Đánh rắn động cỏ" },
      { hanzi: "大刀阔斧", pinyin: "dàdāokuòfǔ", meaning: "Mạnh tay quyết liệt" },
      { hanzi: "当仁不让", pinyin: "dāngrénbúràng", meaning: "Đương nhiên không nhường" },
+     { hanzi: "德高望重", pinyin: "dégāowàngzhòng", meaning: "Đức cao vọng trọng" },
+     { hanzi: "东施效颦", pinyin: "dōngshīxiàopín", meaning: "Đông Thi hiệu tần (Bắt chước bừa)" },
+     { hanzi: "对症下药", pinyin: "duìzhèngxiàyào", meaning: "Bốc thuốc đúng bệnh" },
   ],
   9: [
      { hanzi: "得寸进尺", pinyin: "décùnjìnchǐ", meaning: "Được đằng chân lân đằng đầu" },
      { hanzi: "对牛弹琴", pinyin: "duìniútánqín", meaning: "Đàn gảy tai trâu" },
      { hanzi: "恩重如山", pinyin: "ēnzhòngrúshān", meaning: "Ơn nặng tựa núi" },
      { hanzi: "防患未然", pinyin: "fánghuànwèirán", meaning: "Phòng bệnh hơn chữa bệnh" },
+     { hanzi: "废寝忘食", pinyin: "fèiqǐnwàngshí", meaning: "Mất ăn mất ngủ (chăm chỉ)" },
+     { hanzi: "奉公守法", pinyin: "fènggōngshǒufǎ", meaning: "Phụng công thủ pháp" },
+     { hanzi: "釜底抽薪", pinyin: "fǔdǐchōuxīn", meaning: "Rút củi đáy nồi" },
   ]
 };
 
 /**
- * Lấy danh sách từ vựng ngẫu nhiên từ kho Offline
+ * Get random vocabulary from offline storage
  */
 export const getRandomFallbackVocab = (level: number, count: number): VocabItem[] => {
-  // Lấy list theo level, nếu không có (level 7-9 chưa full) thì fallback về level 6 hoặc 1
+  // Get list by level, fallback to level 6 if level not found (e.g. specialized HSK levels)
+  // If even 6 is missing (should not happen), fallback to 1.
   let sourceList = HSK_DATA[level];
   if (!sourceList || sourceList.length === 0) {
     sourceList = HSK_DATA[6] || HSK_DATA[1];
   }
 
-  // Clone để không ảnh hưởng dữ liệu gốc
+  // Clone to avoid mutating source
   const clone = [...sourceList];
 
-  // Thuật toán Fisher-Yates Shuffle
+  // Fisher-Yates Shuffle
   for (let i = clone.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [clone[i], clone[j]] = [clone[j], clone[i]];
   }
 
-  // Cắt lấy số lượng cần thiết
+  // Slice required count
   const selected = clone.slice(0, count);
 
-  // Thêm ID và trả về
+  // Add runtime ID
   return selected.map((item, index) => ({
     ...item,
     id: `fallback-${level}-${Date.now()}-${index}`

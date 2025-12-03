@@ -9,25 +9,25 @@ export interface VocabResult {
 }
 
 const getClient = (): GoogleGenAI | null => {
-  // Ưu tiên VITE_API_KEY (Vite/Vercel), fallback sang process.env (nếu có)
-  // Sử dụng import.meta.env an toàn
+  // Priority: VITE_API_KEY (Vite/Vercel) -> process.env.API_KEY (Node/Other)
   let apiKey: string | undefined = undefined;
   
   try {
+    // Check for Vite environment
     if (typeof import.meta !== 'undefined' && import.meta.env) {
       apiKey = import.meta.env.VITE_API_KEY;
     }
   } catch (e) {
-    // Bỏ qua lỗi nếu không chạy trong Vite
+    // Ignore error if not in Vite
   }
 
-  // Nếu không tìm thấy, thử process.env (cho Nodejs hoặc các env khác)
+  // Check for Node/Process environment
   if (!apiKey && typeof process !== 'undefined' && process.env) {
     apiKey = process.env.API_KEY;
   }
 
   if (!apiKey) {
-    console.warn("⚠️ Không tìm thấy API Key. Chuyển sang chế độ Offline Fallback.");
+    console.warn("⚠️ API Key missing. Switching to Offline Mode.");
     return null;
   }
 
@@ -37,8 +37,9 @@ const getClient = (): GoogleGenAI | null => {
 export const generateHSKVocab = async (level: number, count: number = 8): Promise<VocabResult> => {
   const ai = getClient();
   
-  // CASE 1: Thiếu API Key -> Dùng Fallback ngay lập tức
+  // CASE 1: Missing API Key -> Immediate Fallback
   if (!ai) {
+    console.log(`📡 Offline Mode: Loading HSK ${level} data from local storage.`);
     return {
       items: getRandomFallbackVocab(level, count),
       source: 'FALLBACK',
@@ -96,7 +97,8 @@ export const generateHSKVocab = async (level: number, count: number = 8): Promis
   } catch (error: any) {
     console.error("❌ Gemini API Error:", error);
     
-    // CASE 2: API Error (Quota exceeded, Network error...) -> Dùng Fallback
+    // CASE 2: API Error (Quota, Network, Parsing) -> Fallback
+    console.log(`🔄 API Failed. Switching to Fallback data for HSK ${level}.`);
     const fallbackItems = getRandomFallbackVocab(level, count);
     
     return {
