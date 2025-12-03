@@ -46,8 +46,9 @@ const App: React.FC = () => {
       setVocabList(vocab);
       setGameConfig({ sourceType: 'HSK', hskLevel: level, mode });
       setView(AppView.GAME);
-    } catch (err) {
-      setError("Không thể tạo danh sách từ vựng. Vui lòng thử lại.");
+    } catch (err: any) {
+      console.error('Error in handleHSKSelection:', err);
+      setError(err.message || "Đã xảy ra lỗi khi tạo từ vựng.");
     } finally {
       setIsLoading(false);
     }
@@ -192,6 +193,27 @@ const App: React.FC = () => {
       {error && (
         <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-r shadow-sm">
           <p>{error}</p>
+        </div>
+      )}
+
+      {/* Error Message */}
+      {error && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 max-w-md animate-pop">
+          <div className="bg-red-50 border-2 border-red-300 rounded-2xl p-4 shadow-xl">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl">⚠️</span>
+              <div className="flex-1">
+                <p className="font-bold text-red-700 mb-1">Lỗi</p>
+                <p className="text-sm text-red-600">{error}</p>
+              </div>
+              <button 
+                onClick={() => setError(null)}
+                className="text-red-400 hover:text-red-600 font-bold"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
