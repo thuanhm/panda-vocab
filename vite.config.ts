@@ -4,5 +4,5 @@ import react from '@vitejs/plugin-react'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: '/', // Vercel sẽ deploy ở root domain
+  base: '/panda-vocab/', // Đảm bảo tên này trùng với tên repository trên GitHub của bạn
 })
