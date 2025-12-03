@@ -10,7 +10,7 @@ const APIStatusChecker: React.FC = () => {
   }, []);
 
   const checkAPIStatus = async () => {
-    const apiKey = import.meta.env.GEMINI_API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
     // Check if API key exists
     if (!apiKey || apiKey === 'PLACEHOLDER_API_KEY' || apiKey === '') {

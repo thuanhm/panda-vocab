@@ -1,6 +1,7 @@
 import { VocabItem } from '../types';
 
-const GEMINI_API_KEY = import.meta.env.GEMINI_API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
+// Vite requires VITE_ prefix for env variables
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 // Fallback vocabulary data for each HSK level
 const FALLBACK_VOCAB: { [key: number]: Array<{ hanzi: string; pinyin: string; meaning: string }> } = {
