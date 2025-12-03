@@ -1,36 +1,38 @@
 import React from 'react';
 
-interface ButtonProps {
-  onClick?: () => void;
-  children: React.ReactNode;
-  variant?: 'primary' | 'secondary' | 'success' | 'danger' | 'outline';
-  disabled?: boolean;
-  className?: string;
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: 'primary' | 'secondary' | 'outline' | 'danger';
+  isLoading?: boolean;
 }
 
 const Button: React.FC<ButtonProps> = ({ 
-  onClick, 
   children, 
-  variant = 'primary',
-  disabled = false,
-  className = ''
+  variant = 'primary', 
+  isLoading, 
+  className = '', 
+  ...props 
 }) => {
-  const baseClasses = "px-6 py-3 rounded-xl font-bold shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95";
+  const baseStyles = "relative inline-flex items-center justify-center px-6 py-3 font-bold transition-all duration-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transform active:scale-95";
   
-  const variantClasses = {
-    primary: "bg-panda-primary text-white hover:bg-pink-400 border-b-4 border-pink-500 hover:border-pink-600",
-    secondary: "bg-panda-secondary text-panda-dark hover:bg-green-300 border-b-4 border-green-400 hover:border-green-500",
-    success: "bg-green-500 text-white hover:bg-green-600 border-b-4 border-green-600 hover:border-green-700",
-    danger: "bg-red-500 text-white hover:bg-red-600 border-b-4 border-red-600 hover:border-red-700",
-    outline: "bg-white text-gray-700 hover:bg-gray-100 border-2 border-gray-300 hover:border-gray-400"
+  const variants = {
+    primary: "bg-panda-primary text-white hover:bg-pink-400 shadow-[0_4px_0_rgb(219,112,147)] hover:shadow-[0_2px_0_rgb(219,112,147)] hover:translate-y-[2px] active:shadow-none active:translate-y-[4px]",
+    secondary: "bg-panda-secondary text-green-900 hover:bg-green-300 shadow-[0_4px_0_rgb(118,200,147)] hover:shadow-[0_2px_0_rgb(118,200,147)] hover:translate-y-[2px] active:shadow-none active:translate-y-[4px]",
+    outline: "bg-white text-gray-600 border-2 border-gray-200 hover:bg-gray-50 shadow-[0_4px_0_rgb(229,231,235)] hover:shadow-[0_2px_0_rgb(229,231,235)] hover:translate-y-[2px] active:shadow-none active:translate-y-[4px]",
+    danger: "bg-red-500 text-white hover:bg-red-600 shadow-[0_4px_0_rgb(185,28,28)] hover:shadow-[0_2px_0_rgb(185,28,28)] hover:translate-y-[2px] active:shadow-none active:translate-y-[4px]",
   };
 
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`${baseClasses} ${variantClasses[variant]} ${className}`}
+    <button 
+      className={`${baseStyles} ${variants[variant]} ${className}`}
+      disabled={isLoading || props.disabled}
+      {...props}
     >
+      {isLoading ? (
+        <svg className="w-5 h-5 mr-2 animate-spin" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+        </svg>
+      ) : null}
       {children}
     </button>
   );

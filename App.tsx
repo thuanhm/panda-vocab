@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { AppView, User, GameMode, VocabItem, GameConfig, VocabSet } from './types';
 import Button from './components/Button';
 import Game from './components/Game';
-import APIStatusChecker from './components/APIStatusChecker';
 import { generateHSKVocab } from './services/geminiService';
 import { parseExcelFile } from './services/excelService';
 import { getSavedSets, createVocabSet, updateVocabSet, deleteVocabSet } from './services/storageService';
@@ -14,6 +13,7 @@ const App: React.FC = () => {
   const [vocabList, setVocabList] = useState<VocabItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null); // State mới cho cảnh báo nhẹ (Offline mode)
   
   // State quản lý danh sách
   const [savedSets, setSavedSets] = useState<VocabSet[]>([]);
@@ -42,14 +42,21 @@ const App: React.FC = () => {
   const handleHSKSelection = async (level: number, mode: GameMode) => {
     setIsLoading(true);
     setError(null);
+    setWarning(null);
     try {
-      const vocab = await generateHSKVocab(level, 8); // Fetch 8 pairs
-      setVocabList(vocab);
+      const result = await generateHSKVocab(level, 8); // Fetch 8 pairs
+      
+      setVocabList(result.items);
       setGameConfig({ sourceType: 'HSK', hskLevel: level, mode });
+      
+      if (result.source === 'FALLBACK') {
+        setWarning(`⚠️ Đang dùng dữ liệu Offline cho HSK ${level}. (Không tìm thấy API Key hoặc lỗi mạng)`);
+      }
+      
       setView(AppView.GAME);
-    } catch (err: any) {
-      console.error('Error in handleHSKSelection:', err);
-      setError(err.message || "Đã xảy ra lỗi khi tạo từ vựng.");
+    } catch (err) {
+      // Vì đã có fallback nên rất hiếm khi nhảy vào đây
+      setError("Không thể khởi tạo trò chơi. Vui lòng tải lại trang.");
     } finally {
       setIsLoading(false);
     }
@@ -115,6 +122,7 @@ const App: React.FC = () => {
     
     setVocabList(selectedVocab);
     setGameConfig({ sourceType: 'UPLOAD', mode, setId: set.id });
+    setWarning(null);
     setView(AppView.GAME);
   };
 
@@ -188,37 +196,13 @@ const App: React.FC = () => {
                <p className="text-sm text-gray-500">Hôm nay bạn muốn học gì?</p>
             </div>
          </div>
-         
-         <div className="flex items-center gap-3">
-           <APIStatusChecker />
-           <Button variant="outline" onClick={() => setView(AppView.AUTH)} className="!px-3 !py-1 text-xs hidden sm:block">Đăng xuất</Button>
-         </div>
+         <Button variant="outline" onClick={() => setView(AppView.AUTH)} className="!px-3 !py-1 text-xs">Đăng xuất</Button>
       </header>
 
       {error && (
-        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-r shadow-sm">
+        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-r shadow-sm flex items-center">
+          <span className="text-2xl mr-3">🚫</span>
           <p>{error}</p>
-        </div>
-      )}
-
-      {/* Error Message */}
-      {error && (
-        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 max-w-md animate-pop">
-          <div className="bg-red-50 border-2 border-red-300 rounded-2xl p-4 shadow-xl">
-            <div className="flex items-start gap-3">
-              <span className="text-2xl">⚠️</span>
-              <div className="flex-1">
-                <p className="font-bold text-red-700 mb-1">Lỗi</p>
-                <p className="text-sm text-red-600">{error}</p>
-              </div>
-              <button 
-                onClick={() => setError(null)}
-                className="text-red-400 hover:text-red-600 font-bold"
-              >
-                ✕
-              </button>
-            </div>
-          </div>
         </div>
       )}
 
@@ -395,7 +379,15 @@ const App: React.FC = () => {
       {view === AppView.AUTH && renderAuth()}
       {view === AppView.DASHBOARD && renderDashboard()}
       {view === AppView.GAME && (
-        <div className="min-h-screen bg-sky-50 py-8">
+        <div className="min-h-screen bg-sky-50 py-8 relative">
+           {/* Fallback Warning Toast */}
+           {warning && (
+             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-yellow-100 text-yellow-800 px-6 py-3 rounded-full shadow-lg border-2 border-yellow-300 animate-bounce-small flex items-center gap-2">
+                <span>📶</span>
+                <span className="font-bold text-sm">{warning}</span>
+             </div>
+           )}
+
            <Game 
               vocabList={vocabList} 
               mode={gameConfig?.mode || GameMode.HANZI_MEANING}

@@ -1,65 +1,71 @@
+import { VocabItem } from "../types";
 import * as XLSX from 'xlsx';
-import { VocabItem } from '../types';
 
-export async function parseExcelFile(file: File): Promise<VocabItem[]> {
+export const parseExcelFile = async (file: File): Promise<VocabItem[]> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 
     reader.onload = (e) => {
       try {
         const data = e.target?.result;
-        const workbook = XLSX.read(data, { type: 'binary' });
+        if (!data) {
+          reject("Đọc file thất bại");
+          return;
+        }
         
-        // Get first sheet
+        const workbook = XLSX.read(data, { type: 'array' });
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
         
-        // Convert to JSON
+        // Convert to array of arrays
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+
+        // Filter valid rows (assuming Row 1 is header, or check content)
+        // We look for rows with at least 3 columns
+        const vocabList: VocabItem[] = [];
         
-        if (jsonData.length < 2) {
-          reject('File Excel phải có ít nhất 1 hàng dữ liệu (ngoài header)');
-          return;
+        // Start from index 1 to skip header, or 0 if no header. 
+        // Heuristic: Check if row 0 looks like "Hanzi", "Pinyin", "Meaning"
+        let startIndex = 0;
+        if (jsonData.length > 0) {
+            const firstRow = jsonData[0].map(c => String(c).toLowerCase());
+            if (firstRow.some((c: string) => c.includes('hanzi') || c.includes('hán') || c.includes('chinese'))) {
+                startIndex = 1;
+            }
         }
 
-        // Skip header row and parse data
-        const vocabItems: VocabItem[] = [];
-        
-        for (let i = 1; i < jsonData.length; i++) {
+        for (let i = startIndex; i < jsonData.length; i++) {
           const row = jsonData[i];
-          
-          // Skip empty rows
-          if (!row || row.length < 3) continue;
-          
-          const [hanzi, pinyin, meaning] = row;
-          
-          // Validate required fields
-          if (!hanzi || !pinyin || !meaning) continue;
-          
-          vocabItems.push({
-            id: `excel-${Date.now()}-${i}`,
-            hanzi: String(hanzi).trim(),
-            pinyin: String(pinyin).trim(),
-            meaning: String(meaning).trim(),
-          });
+          if (row && row.length >= 3) {
+             // Assuming Col 0: Hanzi, Col 1: Pinyin, Col 2: Meaning (Vietnamese)
+             const hanzi = String(row[0] || '').trim();
+             const pinyin = String(row[1] || '').trim();
+             const meaning = String(row[2] || '').trim();
+
+             if (hanzi && meaning) {
+               vocabList.push({
+                 id: `excel-${i}`,
+                 hanzi,
+                 pinyin,
+                 meaning
+               });
+             }
+          }
         }
 
-        if (vocabItems.length === 0) {
-          reject('Không tìm thấy dữ liệu hợp lệ trong file. Đảm bảo file có 3 cột: Hán tự, Pinyin, Nghĩa');
-          return;
+        if (vocabList.length === 0) {
+            reject("Không tìm thấy từ vựng hợp lệ. Hãy đảm bảo các cột là: Hanzi, Pinyin, Meaning.");
+        } else {
+            resolve(vocabList);
         }
 
-        resolve(vocabItems);
-      } catch (error) {
-        console.error('Error parsing Excel:', error);
-        reject('Lỗi khi đọc file Excel. Vui lòng kiểm tra định dạng file.');
+      } catch (err) {
+        console.error("Excel parse error", err);
+        reject("Không thể đọc file Excel.");
       }
     };
 
-    reader.onerror = () => {
-      reject('Không thể đọc file. Vui lòng thử lại.');
-    };
-
-    reader.readAsBinaryString(file);
+    reader.onerror = (err) => reject("Lỗi đọc file: " + err);
+    reader.readAsArrayBuffer(file);
   });
-}
+};

@@ -1,9 +1,51 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { VocabItem } from "../types";
+import { getRandomFallbackVocab } from "./fallbackData";
 
-export const generateHSKVocab = async (level: number, count: number = 8): Promise<VocabItem[]> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+export interface VocabResult {
+  items: VocabItem[];
+  source: 'AI' | 'FALLBACK';
+  error?: string;
+}
+
+const getClient = (): GoogleGenAI | null => {
+  // Ưu tiên VITE_API_KEY (Vite/Vercel), fallback sang process.env (nếu có)
+  // Sử dụng import.meta.env an toàn
+  let apiKey: string | undefined = undefined;
   
+  try {
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+      apiKey = import.meta.env.VITE_API_KEY;
+    }
+  } catch (e) {
+    // Bỏ qua lỗi nếu không chạy trong Vite
+  }
+
+  // Nếu không tìm thấy, thử process.env (cho Nodejs hoặc các env khác)
+  if (!apiKey && typeof process !== 'undefined' && process.env) {
+    apiKey = process.env.API_KEY;
+  }
+
+  if (!apiKey) {
+    console.warn("⚠️ Không tìm thấy API Key. Chuyển sang chế độ Offline Fallback.");
+    return null;
+  }
+
+  return new GoogleGenAI({ apiKey });
+};
+
+export const generateHSKVocab = async (level: number, count: number = 8): Promise<VocabResult> => {
+  const ai = getClient();
+  
+  // CASE 1: Thiếu API Key -> Dùng Fallback ngay lập tức
+  if (!ai) {
+    return {
+      items: getRandomFallbackVocab(level, count),
+      source: 'FALLBACK',
+      error: 'Missing API Key'
+    };
+  }
+
   const systemInstruction = `Bạn là một giáo viên dạy tiếng Trung nhiệt tình cho người Việt Nam. 
   Hãy tạo danh sách từ vựng duy nhất cho cấp độ HSK ${level}.
   Kết quả trả về phải là một mảng JSON hợp lệ.`;
@@ -38,22 +80,29 @@ export const generateHSKVocab = async (level: number, count: number = 8): Promis
 
     const rawData = JSON.parse(jsonStr);
     
-    // Transform into our VocabItem type with IDs
-    return rawData.map((item: any, index: number) => ({
+    // Transform success data
+    const items = rawData.map((item: any, index: number) => ({
       id: `generated-${Date.now()}-${index}`,
       hanzi: item.hanzi,
       pinyin: item.pinyin,
       meaning: item.meaning,
     }));
 
-  } catch (error) {
-    console.error("Error generating vocab:", error);
-    // Fallback data in case of error
-    return [
-      { id: 'err1', hanzi: '你好', pinyin: 'nǐ hǎo', meaning: 'Xin chào (Kiểm tra API Key)' },
-      { id: 'err2', hanzi: '谢谢', pinyin: 'xiè xie', meaning: 'Cảm ơn' },
-      { id: 'err3', hanzi: '再见', pinyin: 'zài jiàn', meaning: 'Tạm biệt' },
-      { id: 'err4', hanzi: '加油', pinyin: 'jiā yóu', meaning: 'Cố lên' },
-    ];
+    return {
+      items,
+      source: 'AI'
+    };
+
+  } catch (error: any) {
+    console.error("❌ Gemini API Error:", error);
+    
+    // CASE 2: API Error (Quota exceeded, Network error...) -> Dùng Fallback
+    const fallbackItems = getRandomFallbackVocab(level, count);
+    
+    return {
+      items: fallbackItems,
+      source: 'FALLBACK',
+      error: error.message || "Unknown API error"
+    };
   }
 };
