@@ -1,0 +1,5 @@
+{
+  "name": "PandaHSK - Ôn tập từ vựng Tiếng Trung",
+  "description": "Ứng dụng ôn tập từ vựng HSK 1-9 dễ thương. Tính năng ghép từ, tải file Excel và tạo từ vựng bằng AI.",
+  "requestFramePermissions": []
+}
